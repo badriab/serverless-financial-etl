@@ -2,7 +2,7 @@
 
 > A production-grade, serverless ETL pipeline on AWS that ingests daily financial market data, transforms it with business-grade logic, and loads it into a relational database — fully automated, infrastructure-as-code, with CI/CD.
 
-![CI](https://img.shields.io/badge/CI-passing-brightgreen)
+![CI]([https://img.shields.io/badge/CI-passing-brightgreen](https://github.com/badriab/serverless-financial-etl/actions/workflows/ci.yml/badge.svg))
 ![Python](https://img.shields.io/badge/python-3.11-blue)
 ![AWS CDK](https://img.shields.io/badge/IaC-AWS_CDK-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -350,7 +350,7 @@ This project was built to demonstrate the following for freelance engagements:
 
 Open to freelance engagements in Python automation, AWS data engineering, and Flask API development.
 
-[LinkedIn](https://linkedin.com/in/aliasgarbadri) · [GitHub](https://github.com/aliasgarbadri) · [Email](mailto:aliasgarbadri5352@gmail.com)
+[LinkedIn](https://www.linkedin.com/in/aliasgar-badri-64941614b) · [GitHub](https://github.com/badriab) · [Email](mailto:aliasgarbadri5352@gmail.com)
 
 ---
 
