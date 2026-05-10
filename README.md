@@ -2,7 +2,7 @@
 
 > A production-grade, serverless ETL pipeline on AWS that ingests daily financial market data, transforms it with business-grade logic, and loads it into a relational database — fully automated, infrastructure-as-code, with CI/CD.
 
-![CI]([https://img.shields.io/badge/CI-passing-brightgreen](https://github.com/badriab/serverless-financial-etl/actions/workflows/ci.yml/badge.svg))
+![![CI](https://github.com/badriab/serverless-financial-etl/actions/workflows/ci.yml/badge.svg)](https://github.com/badriab/serverless-financial-etl/actions/workflows/ci.yml)
 ![Python](https://img.shields.io/badge/python-3.11-blue)
 ![AWS CDK](https://img.shields.io/badge/IaC-AWS_CDK-orange)
 ![License](https://img.shields.io/badge/license-MIT-green)
@@ -209,7 +209,7 @@ This stack runs within the AWS Free Tier for personal/portfolio use.
 ### 1. Clone and install
 
 ```bash
-git clone https://github.com/aliasgarbadri/serverless-financial-etl.git
+git clone https://github.com/badriab/serverless-financial-etl.git
 cd serverless-financial-etl
 
 python -m venv .venv
