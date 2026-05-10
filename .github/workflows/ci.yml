@@ -28,6 +28,8 @@ jobs:
           flake8 . --max-line-length=100 --exclude=.venv,cdk.out || true
           isort --check . || true
 
+      - name: Install test dependencies
+        run: pip install -r tests/requirements.txt
+
       - name: Test
-        run: |
-          pytest tests/ -v --tb=short || true
+        run: pytest tests/ -v --cov=lambdas/transformer --cov-report=term-missing --cov-fail-under=80
