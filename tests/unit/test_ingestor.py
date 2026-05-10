@@ -31,9 +31,19 @@ os.environ.update({
     "ALPHA_VANTAGE_API_KEY": "demo_key",
 })
 
-from api_client import _parse_daily_series, fetch_daily_ohlcv
-from ingestor_handler import _build_s3_key, handler
+import importlib.util, sys, os
 
+# Explicitly load ingestor handler to avoid conflict with transformer handler
+_spec = importlib.util.spec_from_file_location(
+    "ingestor_handler",
+    os.path.join(os.path.dirname(__file__), "../../lambdas/ingestor/handler.py")
+)
+_mod = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_mod)
+handler = _mod.handler
+_build_s3_key = _mod._build_s3_key
+
+from api_client import _parse_daily_series, fetch_daily_ohlcv
 
 # ---------------------------------------------------------------------------
 # Fixtures

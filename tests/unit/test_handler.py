@@ -14,6 +14,7 @@ import os
 import boto3
 import pandas as pd
 import pytest
+from moto import mock_aws
 
 # Set dummy env vars BEFORE importing handler (Lambda reads them at import time)
 os.environ["RAW_BUCKET"] = "test-raw-bucket"
@@ -25,10 +26,19 @@ os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
 os.environ["AWS_SECURITY_TOKEN"] = "testing"
 os.environ["AWS_SESSION_TOKEN"] = "testing"
 
-from moto import mock_aws
 
-from handler import handler, _build_processed_key, _read_raw_json_from_s3
+import importlib.util, sys, os
 
+# Explicitly load transformer handler to avoid conflict with ingestor handler
+_spec = importlib.util.spec_from_file_location(
+    "transformer_handler",
+    os.path.join(os.path.dirname(__file__), "../../lambdas/transformer/handler.py")
+)
+_mod = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(_mod)
+handler = _mod.handler
+_build_processed_key = _mod._build_processed_key
+_read_raw_json_from_s3 = _mod._read_raw_json_from_s3
 
 # ---------------------------------------------------------------------------
 # Helpers
