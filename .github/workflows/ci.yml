@@ -6,15 +6,16 @@ on:
   pull_request:
     branches: [main]
 
+
 jobs:
   lint-and-test:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v4.2.2    # was @v4
 
       - name: Set up Python
-        uses: actions/setup-python@v5
+        uses: actions/setup-python@v5.4.0  # was @v5
         with:
           python-version: "3.11"
 
@@ -34,3 +35,8 @@ jobs:
             --cov=lambdas \
             --cov-report=term-missing \
             --cov-fail-under=50
+      
+      - name: Install dependencies
+        run: |
+          pip install pytest pytest-cov pandas numpy moto[s3] boto3 pyarrow requests psycopg2-binary
+
