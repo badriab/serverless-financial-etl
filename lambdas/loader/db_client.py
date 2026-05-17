@@ -1,101 +1,115 @@
 """
-lambdas/ingestor/api_client.py
+lambdas/loader/db_client.py
 
-Thin HTTP client for the Alpha Vantage TIME_SERIES_DAILY endpoint.
-Retries on transient failures with exponential backoff.
+PostgreSQL connection management and upsert logic for the loader Lambda.
+Credentials are always fetched from AWS Secrets Manager — never hardcoded.
+
+Secret JSON shape (stored in Secrets Manager):
+{
+  "host":     "my-rds-endpoint.rds.amazonaws.com",
+  "port":     5432,
+  "dbname":   "financial_etl",
+  "username": "etl_user",
+  "password": "supersecret"
+}
 """
 
+import json
 import logging
-import time
-from typing import List
+import os
+from contextlib import contextmanager
+from typing import Iterator
 
-import requests
+import boto3
+import psycopg2
+import psycopg2.extras
 
 logger = logging.getLogger(__name__)
 
-BASE_URL = "https://www.alphavantage.co/query"
-MAX_RETRIES = 3
-BACKOFF_BASE = 2  # seconds
+
+def _get_db_credentials(secret_name: str) -> dict:
+    client = boto3.client(
+        "secretsmanager",
+        region_name=os.environ.get("AWS_REGION", "ap-south-1"),
+    )
+    response = client.get_secret_value(SecretId=secret_name)
+    return json.loads(response["SecretString"])
 
 
-def _parse_daily_series(symbol: str, raw: dict) -> List[dict]:
+@contextmanager
+def get_connection(secret_name: str) -> Iterator[psycopg2.extensions.connection]:
     """
-    Parses Alpha Vantage TIME_SERIES_DAILY response into a flat list of
-    OHLCV dicts, one per trading day.
-
-    Alpha Vantage response shape:
-    {
-      "Time Series (Daily)": {
-        "2025-05-08": {"1. open": "182.50", "2. high": "185.20", ...},
-        ...
-      }
-    }
+    Context manager that opens a PostgreSQL connection using credentials
+    from Secrets Manager, yields it, then closes it cleanly.
     """
-    series = raw.get("Time Series (Daily)")
-    if not series:
-        error_msg = raw.get("Note") or raw.get("Information") or raw.get("Error Message")
-        raise ValueError(
-            f"No time series data for {symbol}. "
-            f"Alpha Vantage response: {error_msg or 'unknown error'}"
+    creds = _get_db_credentials(secret_name)
+    conn = psycopg2.connect(
+        host=creds["host"],
+        port=int(creds.get("port", 5432)),
+        dbname=creds["dbname"],
+        user=creds["username"],
+        password=creds["password"],
+        connect_timeout=10,
+        keepalives=1,
+        keepalives_idle=30,
+        keepalives_interval=10,
+        keepalives_count=5,
+    )
+    logger.info({"action": "db_connect_ok", "host": creds["host"], "dbname": creds["dbname"]})
+    try:
+        yield conn
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
+        logger.info({"action": "db_close"})
+
+
+def upsert_records(conn: psycopg2.extensions.connection, records: list) -> int:
+    """
+    Upserts equity snapshot dicts into equity_snapshots table using execute_batch.
+    Returns number of rows affected.
+    """
+    if not records:
+        logger.warning({"action": "upsert_skip", "reason": "empty records list"})
+        return 0
+
+    sql = """
+        INSERT INTO equity_snapshots (
+            symbol, date, open, high, low, close, volume,
+            sma_7, sma_30, pct_change_1d, daily_range,
+            volume_zscore, anomaly_flag, processed_at
+        ) VALUES (
+            %(symbol)s, %(date)s, %(open)s, %(high)s, %(low)s,
+            %(close)s, %(volume)s, %(sma_7)s, %(sma_30)s,
+            %(pct_change_1d)s, %(daily_range)s, %(volume_zscore)s,
+            %(anomaly_flag)s, %(processed_at)s
         )
-
-    records = []
-    for date_str, values in series.items():
-        records.append({
-            "symbol": symbol,
-            "date": date_str,
-            "open": float(values["1. open"]),
-            "high": float(values["2. high"]),
-            "low": float(values["3. low"]),
-            "close": float(values["4. close"]),
-            "volume": float(values["5. volume"]),
-        })
-
-    # Sort ascending by date
-    records.sort(key=lambda r: r["date"])
-    return records
-
-
-def fetch_daily_ohlcv(symbol: str, api_key: str, outputsize: str = "compact") -> List[dict]:
+        ON CONFLICT (symbol, date) DO UPDATE SET
+            open          = EXCLUDED.open,
+            high          = EXCLUDED.high,
+            low           = EXCLUDED.low,
+            close         = EXCLUDED.close,
+            volume        = EXCLUDED.volume,
+            sma_7         = EXCLUDED.sma_7,
+            sma_30        = EXCLUDED.sma_30,
+            pct_change_1d = EXCLUDED.pct_change_1d,
+            daily_range   = EXCLUDED.daily_range,
+            volume_zscore = EXCLUDED.volume_zscore,
+            anomaly_flag  = EXCLUDED.anomaly_flag,
+            processed_at  = EXCLUDED.processed_at
     """
-    Fetches daily OHLCV data for a single symbol from Alpha Vantage.
 
-    Args:
-        symbol:     Ticker symbol e.g. "AAPL"
-        api_key:    Alpha Vantage API key
-        outputsize: "compact" (last 100 days) or "full" (20+ years)
+    # Replace NaN with None — psycopg2 maps Python None to SQL NULL
+    clean = [
+        {k: (None if (isinstance(v, float) and v != v) else v) for k, v in r.items()}
+        for r in records
+    ]
 
-    Returns:
-        List of OHLCV dicts sorted ascending by date.
+    with conn.cursor() as cur:
+        psycopg2.extras.execute_batch(cur, sql, clean)
+        row_count = cur.rowcount
 
-    Raises:
-        ValueError:  If the API returns no data or an error message.
-        RuntimeError: If all retries are exhausted.
-    """
-    params = {
-        "function": "TIME_SERIES_DAILY",
-        "symbol": symbol,
-        "outputsize": outputsize,
-        "apikey": api_key,
-    }
-
-    for attempt in range(1, MAX_RETRIES + 1):
-        try:
-            logger.info({"action": "api_fetch", "symbol": symbol, "attempt": attempt})
-            response = requests.get(BASE_URL, params=params, timeout=10)
-            response.raise_for_status()
-            raw = response.json()
-            records = _parse_daily_series(symbol, raw)
-            logger.info({"action": "api_fetch_ok", "symbol": symbol, "records": len(records)})
-            return records
-
-        except Exception as exc:
-            logger.warning({"action": "api_fetch_error", "symbol": symbol,
-                            "attempt": attempt, "error": str(exc)})
-            if attempt == MAX_RETRIES:
-                raise RuntimeError(
-                    f"Failed to fetch {symbol} after {MAX_RETRIES} attempts: {exc}"
-                ) from exc
-            sleep = BACKOFF_BASE ** attempt
-            logger.info({"action": "retry_backoff", "seconds": sleep})
-            time.sleep(sleep)
+    logger.info({"action": "upsert_ok", "rows": row_count})
+    return row_count
