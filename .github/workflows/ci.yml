@@ -21,7 +21,7 @@ jobs:
 
       - name: Install dependencies
         run: |
-          pip install pytest pytest-cov pandas numpy moto[s3] boto3 pyarrow requests
+          pip install pytest pytest-cov pandas numpy moto[s3] boto3 pyarrow requests psycopg2-binary
 
       - name: Lint
         run: |
@@ -36,7 +36,4 @@ jobs:
             --cov-report=term-missing \
             --cov-fail-under=50
       
-      - name: Install dependencies
-        run: |
-          pip install pytest pytest-cov pandas numpy moto[s3] boto3 pyarrow requests psycopg2-binary
-
+      
