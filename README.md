@@ -116,7 +116,7 @@ serverless-financial-etl/
 - **Secrets Manager integration** — DB credentials never in environment variables or code
 - **Dead letter queues** — failed Lambda invocations captured for inspection
 - **SNS alerting** — email notification within 60 seconds of any pipeline failure
-- **Full test suite** — 26 unit tests, 85%+ coverage, AWS services mocked with `moto`
+- **Full test suite** — 89 unit tests, 80%+ coverage, AWS services mocked with `moto`
 - **One-command deploy** — `cdk deploy --all` provisions the entire stack from scratch
 
 ---
@@ -280,8 +280,8 @@ tests/unit/test_transformer.py::test_sma_calculation PASSED
 tests/unit/test_transformer.py::test_anomaly_flag_triggered PASSED
 tests/unit/test_transformer.py::test_pct_change_accuracy PASSED
 ...
----------- coverage: 87% ----------
-26 passed in 4.31s
+---------- coverage: 80% ----------
+89 passed in 12.40s
 ```
 
 ---
@@ -334,7 +334,7 @@ This project was built to demonstrate the following for freelance engagements:
 | Infrastructure as Code | Full CDK stack in `etl_stack.py` |
 | CI/CD | GitHub Actions workflow with lint, test, synth gates |
 | Production practices | Upserts, DLQs, Secrets Manager, SNS alerts |
-| Testing discipline | 26 unit tests, moto mocks, 87% coverage |
+| Testing discipline | 89 unit tests, moto mocks, 80%+ coverage |
 | Cost awareness | Free Tier compatible, cost breakdown documented |
 
 ---
